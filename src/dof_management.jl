@@ -205,6 +205,20 @@ end
 using AtomsCalculators: potential_energy, energy_forces_virial, 
             forces, virial 
 
+# untested
+function get_obj_fg(sys, calc, dofmgr) 
+   f = x -> energy_dofs(sys, calc, dofmgr, x)
+   g = x -> gradient_dofs(sys, calc, dofmgr, x)
+   return f, g 
+end 
+
+# used in the optim interface 
+function get_obj_fg!(sys, calc, dofmgr) 
+   f = x -> energy_dofs(sys, calc, dofmgr, x)
+   g = (g, x) -> copyto!(g, gradient_dofs(sys, calc, dofmgr, x))
+   return f, g 
+end 
+
 function energy_dofs(sys, calc, dofmgr, x)
    set_dofs!(sys, dofmgr, x)
    return ustrip(potential_energy(sys, calc))

@@ -68,8 +68,7 @@ function minimise(sys, calc;
    # create an objective function
    dofmgr = DofManager(sys1; variablecell = variablecell)
    x0 = get_dofs(sys, dofmgr)
-   obj_f = x -> energy_dofs(sys, calc, dofmgr, x)
-   obj_g! = (g, x) -> copyto!(g, gradient_dofs(sys, calc, dofmgr, x))
+   obj_f, obj_g! = get_obj_fg!(sys, calc, dofmgr)
 
    @assert precond ∈ [nothing, I]
    precond = I 
