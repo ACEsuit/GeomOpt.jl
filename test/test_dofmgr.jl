@@ -11,7 +11,7 @@ sys = AosSystem( rattle!(bulk(:Si, cubic=true) * 2, 0.1) )
 dofmgr = GO.DofManager(sys)
 x = GO.get_dofs(sys, dofmgr)
 @test length(x) == 3 * length(sys)
-@test eltype(x) == Float64
+@test typeof(x) == Vector{Float64}
 @test all(iszero, x)
 u = 0.01 * randn(length(x))
 X = dofmgr.X0 + reinterpret(SVector{3, Float64}, u) * dofmgr.r0
@@ -24,7 +24,7 @@ sys = AosSystem( rattle!(bulk(:Si, cubic=true) * 2, 0.1) )
 dofmgr = GO.DofManager(sys; variablecell = true)
 x = GO.get_dofs(sys, dofmgr)
 @test length(x) == 3 * length(sys) + 9 
-@test eltype(x) == Float64
+@test typeof(x) == Vector{Float64}
 @test all(iszero, x[1:end-9])
 @test x[end-8:end] == [1, 0, 0, 0, 1, 0, 0, 0, 1]
 u = 0.01 * randn(length(x)-9)
@@ -54,6 +54,7 @@ E2 = GO.energy_dofs(sys, sw, dofmgr, x)
 g = GO.gradient_dofs(sys, sw, dofmgr, x)
 @test length(g) == length(x)
 @test length(g) == length(sys) * 3
+@test typeof(g) == Vector{Float64}
 
 ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
                         x -> GO.gradient_dofs(sys, sw, dofmgr, x), 
@@ -73,6 +74,7 @@ E2 = GO.energy_dofs(sys, sw, dofmgr, x)
 g = GO.gradient_dofs(sys, sw, dofmgr, x)
 @test length(g) == length(x)
 @test length(g) == length(sys) * 3 + 9
+@test typeof(g) == Vector{Float64}
 
 ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
                         x -> GO.gradient_dofs(sys, sw, dofmgr, x), 

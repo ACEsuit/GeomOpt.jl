@@ -165,7 +165,7 @@ function get_dofs(sys::AbstractSystem, dofmgr::DofManager)
 
    if fixedcell(dofmgr)
       # there are allocations here that could maybe be avoided 
-      return _pos2dofs((X - dofmgr.X0)/dofmgr.r0, dofmgr)
+      return collect(_pos2dofs((X - dofmgr.X0)/dofmgr.r0, dofmgr))
    end
 
    # variable cell case: note we already checked units and can strip 
@@ -211,7 +211,7 @@ function energy_dofs(sys, calc, dofmgr, x)
 end
 
 
-function gradient_dofs(sys, calc, dofmgr, x)
+function gradient_dofs(sys, calc, dofmgr, x::AbstractVector{T}) where {T} 
    set_dofs!(sys, dofmgr, x)
 
    EFV = energy_forces_virial(sys, calc) 
@@ -226,7 +226,7 @@ function gradient_dofs(sys, calc, dofmgr, x)
    # g_iα = - fiα * r0  [eV] => same unit as E so can strip 
    if fixedcell(dofmgr)
       g = [ ustrip( - dofmgr.r0 * f ) for f in frc ]
-      return _pos2dofs(g, dofmgr)
+      return collect(_pos2dofs(g, dofmgr))::Vector{T}
    end
 
    # variable cell version 
@@ -237,6 +237,6 @@ function gradient_dofs(sys, calc, dofmgr, x)
    g_pos = [ - ustrip(dofmgr.r0 * F' * f) for f in frc ]
 
    return [ _pos2dofs(g_pos, dofmgr); 
-            ( - ustrip.(vir) / F' )[:] ]
+            ( - ustrip.(vir) / F' )[:] ]::Vector{T}
 end
 

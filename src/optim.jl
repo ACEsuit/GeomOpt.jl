@@ -39,13 +39,16 @@ the following symbols
 * `:exp` : will use `Exp(at)`
 * `:id` : will use `I`
 """
-function minimise!(sys, calc;
-                   variable_cell = false, 
+function minimise(sys, calc;
+                   variablecell = false, 
                    precond = nothing,
                    method = :auto,
-                   frc_tol = 1e-6u"eV/Å", 
-                   vir_tol = 1e-6u"eV",
-                   E_tol = 0.0u"eV", 
+                   g_tol = 1e-6, 
+                   f_tol = 0.0, 
+                   # should sub tolerances for units convert ... 
+                  #  frc_tol = 1e-6u"eV/Å", 
+                  #  vir_tol = 1e-6u"eV",
+                  #  E_tol = 0.0u"eV", 
                    verbose = 1,
                    # robust_energy_difference = false, 
                    store_trace = false,
@@ -63,13 +66,10 @@ function minimise!(sys, calc;
    end 
 
    # create an objective function
-   if robust_energy_difference
-      Es0 = site_energies(at)
-      obj_f = x -> Ediff(at, Es0, x)
-   else
-      obj_f = x->energy(at, x)
-   end
-   obj_g! = (g, x) -> copyto!(g, gradient(at, x))
+   dofmgr = DofManager(sys1; variablecell = variablecell)
+   x0 = get_dofs(sys, dofmgr)
+   obj_f = x -> energy_dofs(sys, calc, dofmgr, x)
+   obj_g! = (g, x) -> copyto!(g, gradient_dofs(sys, calc, dofmgr, x))
 
    @assert precond ∈ [nothing, I]
    precond = I 
@@ -118,20 +118,18 @@ function minimise!(sys, calc;
       error("GeomOpt.minimise : unknown `method` option")
    end
 
-   results = optimize( obj_f, obj_g!, dofs(at), optimiser,
-                        Optim.Options( f_tol = ftol, g_tol = gtol,
+   results = optimize( obj_f, obj_g!, x0, optimiser,
+                        Optim.Options( f_tol = f_tol, g_tol = g_tol,
                                        g_calls_limit = g_calls_limit,
                                        store_trace = store_trace,
                                        extended_trace = extended_trace,
                                        callback = callback,
                                        show_trace = (verbose > 1)) )
-   set_dofs!(at, Optim.minimizer(results))
+   set_dofs!(sys1, dofmgr, Optim.minimizer(results))
    # analyse the results
    if verbose > 0
       println(results)
    end
-   return results
-end
 
-
+   return sys1, results
 end
