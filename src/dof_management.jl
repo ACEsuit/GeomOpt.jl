@@ -1,6 +1,6 @@
 
 using StaticArrays, AtomsBase, DecoratedParticles, Unitful 
-using LinearAlgebra: I 
+using LinearAlgebra: I, mul! 
 
 """
 `DofManager`: 
@@ -43,10 +43,12 @@ end
 
 
 # NOTES: 
-#  - the reference positions maybe are not needed 
-#       and could be removed in the next iteration
-#  - length units are implicitly given by the units in X0 and C0. 
-#    unit stripping and conversions will be careful to maintin consistency  
+#  - length units are implicitly given by the units in X0, C0, r0. 
+#    there should be no explicit length-unit stripping but this should be 
+#    implicity through the reference length-scale r0
+#  - at the moment energy-nondimensionalization is achieved simply by 
+#    stripping. A better approach would be to enforce this to happen in 
+#    the preconditioner, which could simply be a rescaling operation. 
 
 # ========================================================================
 #  Constructors 
@@ -186,11 +188,11 @@ function set_dofs!(sys::AbstractSystem, dofmgr::DofManager,
 
    # convert the displacements to positions 
    X = [ F * (dofmgr.X0[i] + U[i] * dofmgr.r0) for i = 1:length(U) ]
-   bb_old = bounding_box(sys)
+   bb_old = dofmgr.C0
    bb_new = ntuple(i -> F * bb_old[i], 3)
    # and update the system 
-   set_positions!(sys, X)
    set_bounding_box!(sys, bb_new)
+   set_positions!(sys, X)
    return sys
 end
 
@@ -200,28 +202,41 @@ end
 #   Compute the gradient with respect to dofs 
 #   from forces and virials 
 
+using AtomsCalculators: potential_energy, energy_forces_virial, 
+            forces, virial 
 
 function energy_dofs(sys, calc, dofmgr, x)
-   
+   set_dofs!(sys, dofmgr, x)
+   return ustrip(potential_energy(sys, calc))
 end
+
 
 function gradient_dofs(sys, calc, dofmgr, x)
+   set_dofs!(sys, dofmgr, x)
 
+   EFV = energy_forces_virial(sys, calc) 
+   frc = EFV.forces 
+   vir = EFV.virial 
+
+   # now transform forces and virial into a gradient w.r.t. x 
+   # ------------------------------------------------------------
+   # fixed cell version 
+   # fi = - ∇_𝐫i E  [eV/A]
+   # 𝐫i = X0[i] + r0 * U[i] 
+   # g_iα = - fiα * r0  [eV] => same unit as E so can strip 
+   if fixedcell(dofmgr)
+      g = [ ustrip( - dofmgr.r0 * f ) for f in frc ]
+      return _pos2dofs(g, dofmgr)
+   end
+
+   # variable cell version 
+   # fi = - ∇_𝐫i E  [eV/A]     𝐫i = F * (X0[i] + r0 * U[i])
+   # ∇_𝐮i' = - fi' * ∂𝐫i/∂𝐮i = - fi' * (r0 * F)   =>   ∇_𝐮i = - F' * r0 * fi 
+   # ∂F E = - virial
+   F = _dofs2defm(x, dofmgr)
+   g_pos = [ - ustrip(dofmgr.r0 * F' * f) for f in frc ]
+
+   return [ _pos2dofs(g_pos, dofmgr); 
+            ( - ustrip.(vir) / F' )[:] ]
 end
-
-
-# function gradient(calc, at::Atoms)
-#    if fixedcell(at)
-#       return rmul!(mat(forces(calc, at))[at.dofmgr.xfree], -1.0)
-#    end
-#    F = cell(at)'
-#    A = F * inv(at.dofmgr.F0)
-#    G = forces(calc, at)
-#    for n = 1:length(G)
-#       G[n] = - A' * G[n]
-#    end
-#    S = - virial(calc, at) * inv(F)'                  # ∂E / ∂F
-#    # S += at.dofmgr.pressure * sigvol_d(at)'     # applied stress  TODO: revive this!
-#    return [ mat(G)[at.dofmgr.xfree]; Array(S)[:] ]
-# end
 

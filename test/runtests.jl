@@ -2,5 +2,5 @@ using GeomOpt
 using Test
 
 @testset "GeomOpt.jl" begin
-    # Write your tests here.
+    @testset "DofManager" begin include("test_dofmgr.jl") end 
 end

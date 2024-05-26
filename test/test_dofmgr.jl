@@ -1,8 +1,9 @@
 
 using AtomsBase, DecoratedParticles, AtomsBuilder, 
-      GeomOpt, Test, StaticArrays, Unitful 
+      GeomOpt, Test, StaticArrays, Unitful, LinearAlgebra 
 
 GO = GeomOpt      
+DP = DecoratedParticles
 
 ## 
 
@@ -35,4 +36,46 @@ GO.set_dofs!(sys, dofmgr, x)
 @test position(sys) == X
 @test bounding_box(sys) == bb_new
 
+##
 
+using EmpiricalPotentials, AtomsCalculators
+using AtomsCalculators: potential_energy
+using ACEbase 
+
+sys = AosSystem( rattle!(bulk(:Si, cubic=true) * (2,2,1), 0.1) )
+dofmgr = GO.DofManager(sys; variablecell=false)
+
+sw = StillingerWeber()
+E1 = potential_energy(sys, sw)
+x = GO.get_dofs(sys, dofmgr)
+E2 = GO.energy_dofs(sys, sw, dofmgr, x)
+@test E2 * u"eV" ≈ E1
+
+g = GO.gradient_dofs(sys, sw, dofmgr, x)
+@test length(g) == length(x)
+@test length(g) == length(sys) * 3
+
+ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
+                        x -> GO.gradient_dofs(sys, sw, dofmgr, x), 
+                        x )
+
+##                        
+
+sys = AosSystem( rattle!(bulk(:Si, cubic=true) * (2,2,1), 0.1) )
+dofmgr = GO.DofManager(sys; variablecell=true)
+
+sw = StillingerWeber()
+E1 = potential_energy(sys, sw)
+x = GO.get_dofs(sys, dofmgr)
+E2 = GO.energy_dofs(sys, sw, dofmgr, x)
+@test E2 * u"eV" ≈ E1
+
+g = GO.gradient_dofs(sys, sw, dofmgr, x)
+@test length(g) == length(x)
+@test length(g) == length(sys) * 3 + 9
+
+ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
+                        x -> GO.gradient_dofs(sys, sw, dofmgr, x), 
+                        x )
+
+##
