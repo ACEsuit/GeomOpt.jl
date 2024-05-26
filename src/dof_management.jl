@@ -7,9 +7,14 @@ using LinearAlgebra: I
 
 Constructor:
 ```julia
-DofManager(sys; free=..., clamp=..., mask=...)
+DofManager(sys; variablecell = false, r0 =..., free=..., clamp=..., mask=...)
 ```
-Set at most one of the kwargs:
+* `variablecell` determines whether the cell is fixed or allowed to change 
+  during optimization 
+* `r0` is a reference length-scale, default set to one (in the unit of sys), 
+   this is used to non-dimensionalize the degrees of freedom. 
+
+In addition set at most one of the kwargs:
 * no kwarg: all atoms are free
 * `free` : list of free atom indices (not dof indices)
 * `clamp` : list of clamped atom indices (not dof indices)
@@ -19,11 +24,11 @@ Set at most one of the kwargs:
 
 On call to the constructor, `DofManager` stores positions and cell
 `X0, C0`, dofs are understood *relative* to this initial configuration.
-`dofs(sys, dm::DofManager)` returns a vector that represents the displacement 
-and a deformation matrix `(U, F)`. The new configuration extracted from a dof vector 
+`get_dofs(sys, dm::DofManager)` returns a vector that represents the
+non-dimensional displacement and a deformation matrix `(U, F)`. The new configuration extracted from a dof vector 
 is understood as 
 * The new cell: `C = F * C0` 
-* The new positions: `𝐫[i] = F * (X0[i] + U[i])`
+* The new positions: `𝐫[i] = F * (X0[i] + U[i] * r0)`
 One aspect of this definition is that clamped atom positions still change via
 the deformation `F`. This is natural in the context of optimizing the 
 cell shape. 
@@ -31,6 +36,7 @@ cell shape.
 mutable struct DofManager{D,T}
    variablecell::Bool
    ifree::Vector{Int}   # extract the free position dofs 
+   r0::T 
    X0::Vector{SVector{D,T}}       # reference positions
    C0::NTuple{D, SVector{D, T}}   # reference cell 
 end
@@ -47,6 +53,7 @@ end
 
 function DofManager(sys::AbstractSystem{D};  
                     variablecell = false, 
+                    r0 = _auto_r0(sys), 
                     free = nothing, 
                     clamp = nothing, 
                     mask = nothing,  )  where {D} 
@@ -56,8 +63,13 @@ function DofManager(sys::AbstractSystem{D};
    X0 = position(sys)
    C0 = tuple(bounding_box(sys)...)   
    ifree = analyze_mask(sys, free, clamp, mask)
-   return DofManager(variablecell, ifree, X0, C0)
+   return DofManager(variablecell, ifree, r0, X0, C0)
 end
+
+function _auto_r0(sys)
+   r = position(sys, 1)[1] 
+   return r0 = one(ustrip(r)) * unit(r) 
+end 
 
 """
 `analyze_mask` : helper function to generate list of dof indices from
@@ -90,7 +102,7 @@ end
 # ========================================================================
 #   DOF Conversions
 
-length_unit(dm::DofManager) = unit(dm.X0[1][1])
+length_unit(dm::DofManager) = unit(dm.r0)
 length_unit(sys::AbstractSystem) = unit(position(sys, 1)[1])
 
 function check_length_units(sys, dm::DofManager) 
@@ -114,18 +126,13 @@ _posdofs(x, dofmgr::DofManager) =
       dofmgr.variablecell ? (@view x[1:end-9]) : x 
 
 
-function _pos2dofs(U, dofmgr) 
-   TFL = eltype(ustrip(U[1]))
-   return reinterpret(TFL, U)[dofmgr.ifree]
-end
+_pos2dofs(U::AbstractVector{SVector{3, T}}, dofmgr)  where {T} = 
+      @view(reinterpret(T, U)[dofmgr.ifree])
 
 function _dofs2pos(x::AbstractVector{T}, dofmgr)  where {T} 
-   TU = eltype(dofmgr.X0) 
    u = zeros(T, 3 * length(dofmgr.X0))
-   @show length(dofmgr.ifree) 
-   @show length( _posdofs(x, dofmgr))
    u[dofmgr.ifree] .= _posdofs(x, dofmgr)
-   return reinterpret(TU, u)
+   return reinterpret(SVector{3, T}, u)
 end
 
 _celldofs(x, dofmgr) = 
@@ -153,20 +160,20 @@ function get_dofs(sys::AbstractSystem, dofmgr::DofManager)
 
    # obtain the positions and their underlying floating point type 
    X = position(sys)
-   TFL = eltype(ustrip(X[1]))
 
    if fixedcell(dofmgr)
-      # there is an allocation here that could maybe be avoided 
-      return _pos2dofs(X - dofmgr.X0, dofmgr)::Vector{TFL}
+      # there are allocations here that could maybe be avoided 
+      return _pos2dofs((X - dofmgr.X0)/dofmgr.r0, dofmgr)
    end
 
    # variable cell case: note we already checked units and can strip 
+   #   (otherwise we would have problems inverting)
    bb = bounding_box(sys) 
    F = ustrip.(hcat(bb...)) / ustrip.(hcat(dofmgr.C0...))
-   # Xi = F * (X0i + Ui)  =>  Ui = F \ Xi - X0i
-   U = [ F \ X[i] - dofmgr.X0[i] for i = 1:length(X) ]
+   # Xi = F * (X0i + Ui * r0)  =>  Ui = (F \ Xi - X0i) / r0 
+   U = [ (F \ X[i] - dofmgr.X0[i]) / dofmgr.r0 for i = 1:length(X) ]
    return [ _pos2dofs(U, dofmgr); 
-            _defm2dofs(F, dofmgr) ]::Vector{TFL} 
+            _defm2dofs(F, dofmgr) ]
 end
 
 
@@ -178,7 +185,7 @@ function set_dofs!(sys::AbstractSystem, dofmgr::DofManager,
    U, F = _dofs2posdefm(x, dofmgr)
 
    # convert the displacements to positions 
-   X = [ F * (dofmgr.X0[i] + U[i]) for i = 1:length(U) ]
+   X = [ F * (dofmgr.X0[i] + U[i] * dofmgr.r0) for i = 1:length(U) ]
    bb_old = bounding_box(sys)
    bb_new = ntuple(i -> F * bb_old[i], 3)
    # and update the system 
