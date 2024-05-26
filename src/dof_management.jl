@@ -202,7 +202,7 @@ end
 
 
 function energy_dofs(sys, calc, dofmgr, x)
-
+   
 end
 
 function gradient_dofs(sys, calc, dofmgr, x)
