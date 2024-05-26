@@ -1,5 +1,5 @@
 module GeomOpt
 
-# Write your package code here.
+include("dof_management.jl")
 
 end

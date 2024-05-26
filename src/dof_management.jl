@@ -1,5 +1,6 @@
 
-
+using StaticArrays, AtomsBase, DecoratedParticles, Unitful 
+using LinearAlgebra: I 
 
 """
 `DofManager`: 
@@ -27,9 +28,9 @@ One aspect of this definition is that clamped atom positions still change via
 the deformation `F`. This is natural in the context of optimizing the 
 cell shape. 
 """
-mutable struct DofManager{D,T,DSQ}
+mutable struct DofManager{D,T}
    variablecell::Bool
-   mask::Vector{Int}   # extract the free position dofs 
+   ifree::Vector{Int}   # extract the free position dofs 
    X0::Vector{SVector{D,T}}       # reference positions
    C0::NTuple{D, SVector{D, T}}   # reference cell 
 end
@@ -52,10 +53,10 @@ function DofManager(sys::AbstractSystem{D};
    if D != 3 
       error("this package assumes d = 3; please file an issue if you neeed a different use case")                    
    end 
-   X0 = positions(sys)
+   X0 = position(sys)
    C0 = tuple(bounding_box(sys)...)   
-   mask = analyze_mask(sys, free, clamp, mask)
-   return DofManager(variablecell, mask, X0, C0)
+   ifree = analyze_mask(sys, free, clamp, mask)
+   return DofManager(variablecell, ifree, X0, C0)
 end
 
 """
@@ -102,63 +103,89 @@ function check_length_units(sys, dm::DofManager)
    nothing 
 end 
 
+fixedcell(dofmgr::DofManager) = 
+      !dofmgr.variablecell 
 
-_posdofs(x) = x[1:end-9]
+variablecell(dofmgr::DofManager) = 
+      dofmgr.variablecell 
 
-_celldofs(x) = x[end-8:end]
+# there is a type-instability here!! 
+_posdofs(x, dofmgr::DofManager) = 
+      dofmgr.variablecell ? (@view x[1:end-9]) : x 
 
 
-function get_dofs(sys::AbstractSystem, dm::DofManager)
-   check_length_units(sys, dm)
+function _pos2dofs(U, dofmgr) 
+   TFL = eltype(ustrip(U[1]))
+   return reinterpret(TFL, U)[dofmgr.ifree]
+end
+
+function _dofs2pos(x::AbstractVector{T}, dofmgr)  where {T} 
+   TU = eltype(dofmgr.X0) 
+   u = zeros(T, 3 * length(dofmgr.X0))
+   @show length(dofmgr.ifree) 
+   @show length( _posdofs(x, dofmgr))
+   u[dofmgr.ifree] .= _posdofs(x, dofmgr)
+   return reinterpret(TU, u)
+end
+
+_celldofs(x, dofmgr) = 
+      dofmgr.variablecell ? x[end-8:end] : missing 
+
+function _defm2dofs(F, dofmgr)
+   return Matrix(F)[:]
+end
+
+# there is another type-instability here!! 
+function _dofs2defm(x::AbstractVector{T}, dofmgr) where {T}
+   if dofmgr.variablecell 
+      return SMatrix{3, 3}(_celldofs(x, dofmgr))
+   else 
+      return SMatrix{3, 3}( T[1 0 0; 0 1 0; 0 0 1] )
+   end 
+end
+
+_dofs2posdefm(x, dofmgr) = 
+      _dofs2pos(x, dofmgr), _dofs2defm(x, dofmgr)
+
+
+function get_dofs(sys::AbstractSystem, dofmgr::DofManager)
+   check_length_units(sys, dofmgr)
 
    # obtain the positions and their underlying floating point type 
    X = position(sys)
    TFL = eltype(ustrip(X[1]))
 
-   _strippedvector(U) = reinterpret(TFL, U)[dofmgr.xfree]::Vector{TFL}
-   
-   if fixedcell(at)
+   if fixedcell(dofmgr)
       # there is an allocation here that could maybe be avoided 
-      return _strippedvector(X - dm.X0)
+      return _pos2dofs(X - dofmgr.X0, dofmgr)::Vector{TFL}
    end
 
-   # variable cell case:
+   # variable cell case: note we already checked units and can strip 
    bb = bounding_box(sys) 
-   F = hcat(bb...) / hcat(dm.C0...)
+   F = ustrip.(hcat(bb...)) / ustrip.(hcat(dofmgr.C0...))
    # Xi = F * (X0i + Ui)  =>  Ui = F \ Xi - X0i
-   U = [ F \ X[i] - dm.X0[i] for i = 1:length(X) ]
-   return [ _strippedvector(U); 
-            Matrix(F)[:] ]
+   U = [ F \ X[i] - dofmgr.X0[i] for i = 1:length(X) ]
+   return [ _pos2dofs(U, dofmgr); 
+            _defm2dofs(F, dofmgr) ]::Vector{TFL} 
 end
 
 
-function set_dofs(sys::AbstractSystem, dofmgr::DofManager, 
-                  x::AbstractVector{T} ) where {T <: AbstractFloat}
-   check_length_units(sys, dm)
+function set_dofs!(sys::AbstractSystem, dofmgr::DofManager, 
+                   x::AbstractVector{T} ) where {T <: AbstractFloat}
+   check_length_units(sys, dofmgr)
 
    # get the displacement from the dof vector    
-   u = zeros(T, 3 * length(sys))
-   u[dofmgr.xfree] .= _posdofs(x) 
-   TU = typeof(one(T) * length_unit(dofmgr))
-   U = reinterpret(SVector{3, TU}, u)
+   U, F = _dofs2posdefm(x, dofmgr)
 
-   if fixedcell(at)
-      X = dofmgr.X0 + U 
-      # FIGURE OUT HOW TO HANDLE THIS?!?
-      return set_positions!(at, positions(at, at.dofmgr.xfree, x))
-   end
-
-   # variable cell case:
-   #  Xi = F * (X0i + Ui)
-   F = SMatrix{3, 3}(_celldofs(x))
-   X = [ F * (X0[i] + U[i]) for i = 1:length(U) ]
-
-   # FIGURE THIS OUT AS WELL 
-   set_positions!(at, Y)
-   set_cell!(at, F')
-   return at
+   # convert the displacements to positions 
+   X = [ F * (dofmgr.X0[i] + U[i]) for i = 1:length(U) ]
+   bb_old = bounding_box(sys)
+   bb_new = ntuple(i -> F * bb_old[i], 3)
+   # and update the system 
+   set_positions!(sys, X)
+   set_bounding_box!(sys, bb_new)
+   return sys
 end
-
 
 
 
@@ -176,18 +203,18 @@ function gradient_dofs(sys, calc, dofmgr, x)
 end
 
 
-function gradient(calc::AbstractCalculator, at::Atoms)
-   if fixedcell(at)
-      return rmul!(mat(forces(calc, at))[at.dofmgr.xfree], -1.0)
-   end
-   F = cell(at)'
-   A = F * inv(at.dofmgr.F0)
-   G = forces(calc, at)
-   for n = 1:length(G)
-      G[n] = - A' * G[n]
-   end
-   S = - virial(calc, at) * inv(F)'                  # ∂E / ∂F
-   # S += at.dofmgr.pressure * sigvol_d(at)'     # applied stress  TODO: revive this!
-   return [ mat(G)[at.dofmgr.xfree]; Array(S)[:] ]
-end
+# function gradient(calc, at::Atoms)
+#    if fixedcell(at)
+#       return rmul!(mat(forces(calc, at))[at.dofmgr.xfree], -1.0)
+#    end
+#    F = cell(at)'
+#    A = F * inv(at.dofmgr.F0)
+#    G = forces(calc, at)
+#    for n = 1:length(G)
+#       G[n] = - A' * G[n]
+#    end
+#    S = - virial(calc, at) * inv(F)'                  # ∂E / ∂F
+#    # S += at.dofmgr.pressure * sigvol_d(at)'     # applied stress  TODO: revive this!
+#    return [ mat(G)[at.dofmgr.xfree]; Array(S)[:] ]
+# end
 
