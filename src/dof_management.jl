@@ -62,7 +62,7 @@ function DofManager(sys::AbstractSystem{D};
    if D != 3 
       error("this package assumes d = 3; please file an issue if you neeed a different use case")                    
    end 
-   X0 = position(sys)
+   X0 = copy(position(sys))
    C0 = tuple(bounding_box(sys)...)   
    ifree = analyze_mask(sys, free, clamp, mask)
    return DofManager(variablecell, ifree, r0, X0, C0)
@@ -246,7 +246,7 @@ function gradient_dofs(sys, calc, dofmgr, x::AbstractVector{T}) where {T}
    # variable cell version 
    # fi = - ∇_𝐫i E  [eV/A]     𝐫i = F * (X0[i] + r0 * U[i])
    # ∇_𝐮i' = - fi' * ∂𝐫i/∂𝐮i = - fi' * (r0 * F)   =>   ∇_𝐮i = - F' * r0 * fi 
-   # ∂F E = - virial
+   # ∂F E |_{F = I} = - virial  => ∂F E = - virial / F' 
    F = _dofs2defm(x, dofmgr)
    g_pos = [ - ustrip(dofmgr.r0 * F' * f) for f in frc ]
 
