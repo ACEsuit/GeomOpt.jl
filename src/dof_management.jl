@@ -206,14 +206,14 @@ using AtomsCalculators: potential_energy, energy_forces_virial,
             forces, virial 
 
 # untested
-function get_obj_fg(sys, calc, dofmgr) 
+function get_obj_fg(sys::AbstractSystem, calc, dofmgr::DofManager) 
    f = x -> energy_dofs(sys, calc, dofmgr, x)
    g = x -> gradient_dofs(sys, calc, dofmgr, x)
    return f, g 
 end 
 
 # used in the optim interface 
-function get_obj_fg!(sys, calc, dofmgr) 
+function get_obj_fg!(sys::AbstractSystem, calc, dofmgr::DofManager) 
    f = x -> energy_dofs(sys, calc, dofmgr, x)
    g = (g, x) -> copyto!(g, gradient_dofs(sys, calc, dofmgr, x))
    return f, g 
