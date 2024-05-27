@@ -35,7 +35,8 @@ path_init = [ (sys = deepcopy(sys0); set_position!(sys, 1, t * 𝐫2); sys)
                for t in range(0.0, 1.0, length = Nimg) ]
 E_init = potential_energy.(path_init, Ref(calc))
 @info("Initial guess, energy difference")
-display(round.(u"eV", E_init .- E_init[1], digits=2))
+δE_init = round.(u"eV", E_init .- E_init[1], digits=2)
+display(δE_init)
 
 ##
 # create a system -> dof mapping 
@@ -54,12 +55,23 @@ all(E_check .≈ ustrip.(E_init))
 preconI = SaddleSearch.localPrecon(precon = [I], precon_prep! = (P, x) -> P)
 stringmethod = ODEString(reltol=0.1, tol = 1e-2, maxnit = 100, 
                          precon_scheme = preconI, verbose = 1)
-PATHx, PATHlog, _ = SaddleSearch.run!(stringmethod, obj_f, obj_g, Path(xx_init))
-@show PATHlog[:maxres][end]
+xx_string, log_string, _ = SaddleSearch.run!(stringmethod, obj_f, obj_g, Path(xx_init))
+@show log_string[:maxres][end]
 
 @info("energy along initial / final path")
-E_final = [ obj_f(x) for x in PATHx ]
-display( hcat(round.(u"eV", E_init .- E_init[1], digits=2), 
-              round.(E_final .- E_final[1], digits=2)*u"eV") )
+E_string = [ obj_f(x) for x in xx_string ]
+δE_string = round.(E_string .- E_string[1], digits=2)*u"eV"
+display( hcat(δE_init, δE_string) )
 
-              
+## Now try a NEB               
+
+neb = ODENEB(reltol=1e-2, k=0.0002, interp=3, tol = 1e-2, maxnit = 100,
+              precon_scheme = preconI, verbose = 1)
+xx_neb, log_neb, _ = run!(neb, obj_f, obj_g, Path(xx_init))
+@show log_neb[:maxres][end]
+    
+@info("energy along initial / string / neb paths")
+E_neb = [ obj_f(x) for x in xx_neb ]
+δE_neb = round.(E_neb .- E_neb[1], digits=2)*u"eV"
+display( hcat(δE_init, δE_string, δE_neb) )
+

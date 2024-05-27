@@ -53,10 +53,16 @@ x, v, report = SaddleSearch.run!(dimer, obj_f, obj_g, x1, v0)
 
 # TODO: add hessian spectrum test once relevant PRs are merged
 
-
 bb = BBDimer(a0_trans=1e-3, a0_rot=1e-3, len=1e-3, maxnumdE=1000, 
                     tol_trans = 1e-2, tol_rot = 1e-1)
 x, v, report = SaddleSearch.run!(bb, obj_f, obj_g, x1, v0)
 @info("|∇E(x_final)|_inf = $(norm(obj_g(x), Inf))") 
+
+# TODO: add hessian spectrum test once relevant PRs are merged
+
+# this one isn't doing too well; unclear why ... 
+# oded = ODEDimer(len=1e-3, maxnumdE=1000, tol_trans = 1e-2, tol_rot = 1e-1)
+# x, v, report = SaddleSearch.run!(oded, obj_f, obj_g, x1, v0)
+# @info("|∇E(x_final)|_inf = $(norm(obj_g(x), Inf))") 
 
 # TODO: add hessian spectrum test once relevant PRs are merged
