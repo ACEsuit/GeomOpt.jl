@@ -1,7 +1,3 @@
-#
-# WARNING : this example runs but gives 
-#           unphysical results
-#
 
 using AtomsBase, DecoratedParticles, AtomsBuilder, 
       GeomOpt, Test, StaticArrays, Unitful, LinearAlgebra , 
