@@ -67,8 +67,8 @@ function minimise(sys, calc;
 
    # create an objective function
    dofmgr = DofManager(sys1; variablecell = variablecell)
-   x0 = get_dofs(sys, dofmgr)
-   obj_f, obj_g! = get_obj_fg!(sys, calc, dofmgr)
+   x0 = get_dofs(sys1, dofmgr)
+   obj_f, obj_g! = get_obj_fg!(sys1, calc, dofmgr)
 
    if isnothing(precond)
       precond = I 
@@ -96,15 +96,17 @@ function minimise(sys, calc;
    #    end
    # end
 
+   
+
    if precond isa AbstractMatrix && precond != I 
       P = precond 
       precondprep = (P, x) -> P 
    elseif precond isa Function  
-      P = precond(sys1, calc)
-      sys2 = deepcopy(sys1)
+      P = precond(sys1)
+      sys_P = deepcopy(sys1)
       precondprep = (P, x) -> begin
-               sys = set_dofs!(sys2, dofmgr, x)
-               P = precond(sys, calc)
+               sys = set_dofs!(sys_P, dofmgr, x)
+               P = precond(sys_P)
             end
    end   
 
