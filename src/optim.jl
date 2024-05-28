@@ -70,8 +70,9 @@ function minimise(sys, calc;
    x0 = get_dofs(sys, dofmgr)
    obj_f, obj_g! = get_obj_fg!(sys, calc, dofmgr)
 
-   @assert precond ∈ [nothing, I]
-   precond = I 
+   if isnothing(precond)
+      precond = I 
+   end 
    # # create a preconditioner
    # to be re-introduced 
    # if isa(precond, Symbol)
@@ -100,8 +101,9 @@ function minimise(sys, calc;
       if precond == I
          optimiser = ConjugateGradient(linesearch = BackTracking(order=2, maxstep=maxstep))
       else
+         @assert precond isa AbstractMatrix
          optimiser = ConjugateGradient( P = precond,
-                           precondprep = (P, x) -> update!(P, at, x),
+                           precondprep = (P, x) -> precond, # update!(P, at, x),
                            linesearch = BackTracking(order=2, maxstep=maxstep) )
       end
    elseif method == :lbfgs
