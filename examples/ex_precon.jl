@@ -1,8 +1,13 @@
+#
+# WARNING : this example runs but gives 
+#           unphysical results
+#
+
 using AtomsBase, DecoratedParticles, AtomsBuilder, 
       GeomOpt, Test, StaticArrays, Unitful, LinearAlgebra , 
-      EmpiricalPotentials, SparseArrays
+      EmpiricalPotentials, SparseArrays, SaddleSearch
 
-using AtomsCalculators: virial, forces
+using AtomsCalculators: virial, forces, potential_energy
 GO = GeomOpt      
 DP = DecoratedParticles
 
@@ -54,6 +59,3 @@ sysP, resultP = GO.minimise(deepcopy(sys0), sw; g_tol = 1e-5, precond = precondi
 @info("     Without P : # iterations = $(result.iterations)")
 @info(" With static P : # iterations = $(resultP.iterations)")
 @info("With dynamic P : # iterations = $(resultP.iterations)")
-
-##
-
