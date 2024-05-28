@@ -36,16 +36,24 @@ end
 
 ##
 
-sys0 = AosSystem( rattle!(bulk(:Si, cubic=true) * (10,2,2), 0.1) )
+sys = rattle!(bulk(:Si, cubic=true) * (20,2,2), 0.1)
+sys = deleteat!(sys, 1)
+sys = deleteat!(sys, 100)
 @show length(sys)
+
+sys0 = AosSystem(sys)
 sw = StillingerWeber()
+
 sys1, result = GO.minimise(deepcopy(sys0), sw; g_tol = 1e-5)
 
 P = preconditioner(sys0, sw)
 sysP, resultP = GO.minimise(deepcopy(sys0), sw; g_tol = 1e-5, precond = P)
 
-@info("Without P : # iterations = $(result.iterations)")
-@info("   With P : # iterations = $(resultP.iterations)")
+sysP, resultP = GO.minimise(deepcopy(sys0), sw; g_tol = 1e-5, precond = preconditioner)
+
+@info("     Without P : # iterations = $(result.iterations)")
+@info(" With static P : # iterations = $(resultP.iterations)")
+@info("With dynamic P : # iterations = $(resultP.iterations)")
 
 ##
 

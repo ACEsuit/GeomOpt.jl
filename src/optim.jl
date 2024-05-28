@@ -96,24 +96,32 @@ function minimise(sys, calc;
    #    end
    # end
 
+   if precond isa AbstractMatrix && precond != I 
+      P = precond 
+      precondprep = (P, x) -> P 
+   elseif precond isa Function  
+      P = precond(sys1, calc)
+      sys2 = deepcopy(sys1)
+      precondprep = (P, x) -> begin
+               sys = set_dofs!(sys2, dofmgr, x)
+               P = precond(sys, calc)
+            end
+   end   
+
    # choose the optimisation method Optim.jl
    if method == :auto || method == :cg
       if precond == I
          optimiser = ConjugateGradient(linesearch = BackTracking(order=2, maxstep=maxstep))
       else
-         @assert precond isa AbstractMatrix
-         optimiser = ConjugateGradient( P = precond,
-                           precondprep = (P, x) -> precond, # update!(P, at, x),
+         optimiser = ConjugateGradient( P = P, precondprep = precondprep, 
                            linesearch = BackTracking(order=2, maxstep=maxstep) )
       end
    elseif method == :lbfgs
-      optimiser = LBFGS( P = precond,
-                        precondprep = (P, x) -> update!(P, at, x),
+      optimiser = LBFGS( P = P, precondprep = precondprep,
                         alphaguess = LineSearches.InitialHagerZhang(),
                         linesearch = BackTracking(order=2, maxstep=maxstep) )
    elseif method == :sd
-      optimiser = Optim.GradientDescent( P = precond,
-                  precondprep = (P, x) -> update!(P, at, x),
+      optimiser = Optim.GradientDescent( P = P, precondprep = precondprep,
                   linesearch = BackTracking(order=2, maxstep=maxstep) )
    else
       error("GeomOpt.minimise : unknown `method` option")
