@@ -31,8 +31,15 @@ calc = LennardJones(-1.0u"eV", r0, zU, zU, 3*r0,)
 
 # generate an initial guess for the MEP 
 Nimg = 11
-path_init = [ (sys = deepcopy(sys0); set_position!(sys, 1, t * 𝐫2); sys)
-               for t in range(0.0, 1.0, length = Nimg) ]
+path_init = [ (sys = deepcopy(sys0); 
+            set_position!(sys, 1, t * 𝐫2);
+            sys;)  
+            for t in range(0.0, 1.0, length = Nimg) ];
+# path_init = [ (   sys = deepcopy(sys0); 
+#                   set_position!(sys, 1, t * 𝐫2); 
+#                   sys )
+#                for t in range(0.0, 1.0, length = Nimg) ]
+             
 E_init = potential_energy.(path_init, Ref(calc))
 @info("Initial guess, energy difference")
 δE_init = round.(u"eV", E_init .- E_init[1], digits=2)

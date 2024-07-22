@@ -2,6 +2,8 @@
 using AtomsBase, DecoratedParticles, AtomsBuilder, 
       GeomOpt, Test, StaticArrays, Unitful, LinearAlgebra 
 
+using AtomsCalculators: virial, forces, potential_energy      
+
 GO = GeomOpt      
 DP = DecoratedParticles
 
@@ -51,14 +53,17 @@ x = GO.get_dofs(sys, dofmgr)
 E2 = GO.energy_dofs(sys, sw, dofmgr, x)
 @test E2 * u"eV" ≈ E1
 
+##
+
 g = GO.gradient_dofs(sys, sw, dofmgr, x)
 @test length(g) == length(x)
 @test length(g) == length(sys) * 3
 @test typeof(g) == Vector{Float64}
 
-ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
+_fd = ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
                         x -> GO.gradient_dofs(sys, sw, dofmgr, x), 
                         x )
+@test _fd
 
 ##                        
 
@@ -76,8 +81,9 @@ g = GO.gradient_dofs(sys, sw, dofmgr, x)
 @test length(g) == length(sys) * 3 + 9
 @test typeof(g) == Vector{Float64}
 
-ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
+_fd = ACEbase.Testing.fdtest( x -> GO.energy_dofs(sys, sw, dofmgr, x), 
                         x -> GO.gradient_dofs(sys, sw, dofmgr, x), 
                         x )
+@test _fd 
 
 ##

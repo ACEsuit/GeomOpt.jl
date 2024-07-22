@@ -3,7 +3,7 @@ using AtomsBase, DecoratedParticles, AtomsBuilder,
       GeomOpt, Test, StaticArrays, Unitful, LinearAlgebra , 
       EmpiricalPotentials, SaddleSearch
 
-using AtomsCalculators: virial, forces
+using AtomsCalculators: virial, forces, potential_energy
 GO = GeomOpt      
 DP = DecoratedParticles
 
@@ -27,7 +27,7 @@ sys0 = AosSystem( bulk(:Cu, cubic=true) * 3 )
 # delete the second atom and move at1 onto the midpoint 
 # the new system sys1 is an initial guess for a saddle point 
 deleteat!(sys0.particles, 2)
-sys1 = SoaSystem(sys0)
+sys1 = AosSystem(sys0)
 set_position!(sys1, 1, 0.5 * 𝐫2)
 
 # LJ is not a good model for Cu, but a perfectly ok model for a generic 
