@@ -18,7 +18,7 @@ x = GO.get_dofs(sys, dofmgr)
 u = 0.01 * randn(length(x))
 X = dofmgr.X0 + reinterpret(SVector{3, Float64}, u) * dofmgr.r0
 GO.set_dofs!(sys, dofmgr, u)
-@test position(sys) == X
+@test position(sys, :) == X
 
 ##
 
@@ -35,7 +35,7 @@ x = [u; F[:]]
 X = Ref(F) .* ( dofmgr.X0 + reinterpret(SVector{3, Float64}, u) * dofmgr.r0 )
 bb_new = tuple([F * b for b in bounding_box(sys)]...)
 GO.set_dofs!(sys, dofmgr, x)
-@test position(sys) == X
+@test position(sys, :) == X
 @test bounding_box(sys) == bb_new
 
 ##
