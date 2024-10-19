@@ -62,7 +62,7 @@ function DofManager(sys::AbstractSystem{D};
    if D != 3 
       error("this package assumes d = 3; please file an issue if you neeed a different use case")                    
    end 
-   X0 = copy(position(sys))
+   X0 = copy(position(sys, :))
    C0 = tuple(bounding_box(sys)...)   
    ifree = analyze_mask(sys, free, clamp, mask)
    return DofManager(variablecell, ifree, r0, X0, C0)
@@ -161,7 +161,7 @@ function get_dofs(sys::AbstractSystem, dofmgr::DofManager)
    check_length_units(sys, dofmgr)
 
    # obtain the positions and their underlying floating point type 
-   X = position(sys)
+   X = position(sys, :)
 
    if fixedcell(dofmgr)
       # there are allocations here that could maybe be avoided 

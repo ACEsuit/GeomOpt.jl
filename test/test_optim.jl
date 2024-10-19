@@ -25,8 +25,8 @@ sys2, result = GO.minimise(sys1, sw; g_tol = 1e-5)
 
 @test result.g_residual < 1e-5
 @test bounding_box(sys2) == bounding_box(sys1) == bounding_box(sys0)
-X0 = [ x - position(sys0, 1) for x in position(sys0) ]
-X2 = [ x - position(sys2, 1) for x in position(sys2) ]
+X0 = [ x - position(sys0, 1) for x in position(sys0, :) ]
+X2 = [ x - position(sys2, 1) for x in position(sys2, :) ]
 @test maximum(ustrip.(norm.(X2 .- X0)) .< 1e-6)
 
 ##
