@@ -1,7 +1,7 @@
 name = "GeomOpt"
 uuid = "ca147568-c688-4a55-a13d-dbd284330f4b"
 authors = ["Christoph Ortner <christophortner@gmail.com> and contributors"]
-version = "0.0.5"
+version = "0.1.0"
 
 [deps]
 ACEbase = "14bae519-eb20-449c-a949-9c58ed33163e"
@@ -33,7 +33,7 @@ StaticArrays = "1.9"
 Unitful = "1.20"
 julia = "1.9, 1.10"
 EmpiricalPotentials = "0.2"
-SaddleSearch = "0.0.1"
+SaddleSearch = "0.0.1, 0.0.2"
 
 [extras]
 EmpiricalPotentials = "38527215-9240-4c91-a638-d4250620c9e2"
